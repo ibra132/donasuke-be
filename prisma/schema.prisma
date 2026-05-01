@@ -1,0 +1,173 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum Role {
+  DONATUR
+  FUNDRAISER
+  ADMIN
+}
+
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+enum CampaignStatus {
+  DRAFT
+  PENDING_REVIEW
+  APPROVED
+  ACTIVE
+  REJECTED
+  CLOSED
+  EXPIRED
+}
+
+enum DonationStatus {
+  PENDING
+  SUCCESS
+  FAILED
+  EXPIRED
+}
+
+enum WithdrawalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+model User {
+  id                 String              @id @default(cuid())
+  name               String
+  email              String              @unique
+  password           String
+  role               Role                @default(DONATUR)
+  verificationStatus VerificationStatus?
+  nik                String?
+  ktpUrl             String?
+  avatar             String?
+  bio                String?
+  createdAt          DateTime            @default(now())
+
+  campaigns      Campaign[]
+  donations      Donation[]
+  savedCampaigns SavedCampaign[]
+  reports        Report[]
+  withdrawals    Withdrawal[]
+}
+
+model Campaign {
+  id              String         @id @default(cuid())
+  userId          String
+  title           String
+  category        String
+  description     String
+  targetAmount    Float
+  collectedAmount Float          @default(0)
+  imageUrl        String?
+  status          CampaignStatus @default(DRAFT)
+  deadline        DateTime
+  location        String?
+  rejectReason    String?
+  createdAt       DateTime       @default(now())
+
+  user        User               @relation(fields: [userId], references: [id])
+  documents   CampaignDocument[]
+  donations   Donation[]
+  updates     CampaignUpdate[]
+  savedBy     SavedCampaign[]
+  reports     Report[]
+  withdrawals Withdrawal[]
+}
+
+model CampaignDocument {
+  id           String   @id @default(cuid())
+  campaignId   String
+  documentType String
+  fileUrl      String
+  createdAt    DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model Donation {
+  id              String         @id @default(cuid())
+  userId          String
+  campaignId      String
+  amount          Float
+  platformFee     Float          @default(0)
+  isAnonymous     Boolean        @default(false)
+  message         String?
+  status          DonationStatus @default(PENDING)
+  paymentToken    String?
+  paymentMethod   String?
+  midtransOrderId String?        @unique
+  paidAt          DateTime?
+  createdAt       DateTime       @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model Withdrawal {
+  id            String           @id @default(cuid())
+  campaignId    String
+  userId        String
+  amount        Float
+  adminFee      Float            @default(0)
+  status        WithdrawalStatus @default(PENDING)
+  bankAccount   String
+  bankName      String
+  accountHolder String
+  note          String?
+  proofUrl      String?
+  createdAt     DateTime         @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+  user     User     @relation(fields: [userId], references: [id])
+}
+
+model CampaignUpdate {
+  id         String   @id @default(cuid())
+  campaignId String
+  content    String
+  createdAt  DateTime @default(now())
+
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+}
+
+model SavedCampaign {
+  id         String   @id @default(cuid())
+  userId     String
+  campaignId String
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+
+  @@unique([userId, campaignId])
+}
+
+model Report {
+  id         String   @id @default(cuid())
+  userId     String
+  campaignId String
+  reason     String
+  createdAt  DateTime @default(now())
+
+  user     User     @relation(fields: [userId], references: [id])
+  campaign Campaign @relation(fields: [campaignId], references: [id])
+}

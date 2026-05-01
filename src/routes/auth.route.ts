@@ -108,3 +108,45 @@ authRoute.post("/login", async (c) => {
     },
   });
 });
+
+// -------------------------------------------------------
+// GET CURRENT USER
+// GET /api/auth/me
+// -------------------------------------------------------
+authRoute.get("/me", async (c) => {
+  const authHeader = c.req.header("Authorization");
+
+  if (!authHeader || !authHeader.startsWith("Bearer ")) {
+    return c.json({ message: "Token tidak ditemukan!" }, 401);
+  }
+
+  const token = authHeader.split(" ")[1];
+
+  try {
+    const decoded = jwt.verify(token, process.env.JWT_SECRET as string) as {
+      id: string;
+    };
+
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.id },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        role: true,
+        avatar: true,
+        bio: true,
+        verificationStatus: true,
+        createdAt: true,
+      },
+    });
+
+    if (!user) {
+      return c.json({ message: "User tidak ditemukan!" }, 404);
+    }
+
+    return c.json({ user });
+  } catch (error) {
+    return c.json({ message: "Token tidak valid!" }, 401);
+  }
+});

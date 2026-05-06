@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,17 +7,9 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  DONATUR
-  FUNDRAISER
-  ADMIN
-}
-
-enum VerificationStatus {
-  PENDING
-  APPROVED
-  REJECTED
-}
+// ============================================================
+// ENUMS
+// ============================================================
 
 enum CampaignStatus {
   DRAFT
@@ -49,12 +35,68 @@ enum WithdrawalStatus {
   PAID
 }
 
+enum VerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+// ============================================================
+// RBAC
+// ============================================================
+
+model Role {
+  id          String   @id @default(cuid())
+  name        String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  users       UserRole[]
+  permissions RolePermission[]
+}
+
+model Permission {
+  id          String   @id @default(cuid())
+  action      String   @unique
+  description String?
+  createdAt   DateTime @default(now())
+
+  roles RolePermission[]
+}
+
+model UserRole {
+  id        String   @id @default(cuid())
+  userId    String
+  roleId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+  role Role @relation(fields: [roleId], references: [id])
+
+  @@unique([userId, roleId])
+}
+
+model RolePermission {
+  id           String   @id @default(cuid())
+  roleId       String
+  permissionId String
+  createdAt    DateTime @default(now())
+
+  role       Role       @relation(fields: [roleId], references: [id])
+  permission Permission @relation(fields: [permissionId], references: [id])
+
+  @@unique([roleId, permissionId])
+}
+
+// ============================================================
+// MODELS
+// ============================================================
+
 model User {
   id                 String              @id @default(cuid())
   name               String
   email              String              @unique
   password           String
-  role               Role                @default(DONATUR)
   verificationStatus VerificationStatus?
   nik                String?
   ktpUrl             String?
@@ -62,6 +104,7 @@ model User {
   bio                String?
   createdAt          DateTime            @default(now())
 
+  roles          UserRole[]
   campaigns      Campaign[]
   donations      Donation[]
   savedCampaigns SavedCampaign[]

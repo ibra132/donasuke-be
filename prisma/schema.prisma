@@ -93,16 +93,17 @@ model RolePermission {
 // ============================================================
 
 model User {
-  id                 String              @id @default(cuid())
-  name               String
-  email              String              @unique
-  password           String
-  verificationStatus VerificationStatus?
-  nik                String?
-  ktpUrl             String?
-  avatar             String?
-  bio                String?
-  createdAt          DateTime            @default(now())
+  id                       String              @id @default(cuid())
+  name                     String
+  email                    String              @unique
+  password                 String
+  verificationStatus       VerificationStatus?
+  verificationRejectReason String?
+  nik                      String?
+  ktpUrl                   String?
+  avatar                   String?
+  bio                      String?
+  createdAt                DateTime            @default(now())
 
   roles          UserRole[]
   campaigns      Campaign[]

@@ -3,6 +3,7 @@ import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import prisma from "../lib/prisma";
 import { authenticate } from "../middleware/auth.middleware";
+import { registerSchema, loginSchema } from "../validators/auth.validator";
 
 export const authRoute = new Hono();
 
@@ -15,33 +16,47 @@ authRoute.get("/", (c) => {
 // POST /api/auth/register
 // -------------------------------------------------------
 authRoute.post("/register", async (c) => {
-  const { name, email, password } = await c.req.json();
+  const body = await c.req.json();
 
   // Validate input
-  if (!name || !email || !password) {
-    return c.json({ message: "Semua field wajib diisi!" }, 400);
+  const result = registerSchema.safeParse(body);
+  if (!result.success) {
+    return c.json(
+      {
+        message: "Validasi gagal",
+        errors: result.error.flatten().fieldErrors,
+      },
+      400
+    );
   }
 
-  // Check if email already exists
-  if (email) {
-    const existingUser = await prisma.user.findUnique({
-      where: { email },
-    });
+  const { name, email, password } = result.data;
 
-    if (existingUser) {
-      return c.json({ message: "Email sudah terdaftar!" }, 400);
-    }
+  // Check if user already exists
+  const existingUser = await prisma.user.findUnique({ where: { email } });
+
+  if (existingUser) {
+    return c.json({ message: "Email sudah terdaftar" }, 400);
   }
 
-  // Hash password before saving to database
+  // Hash password
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  // Create new user
+  // Create user and assign default role
   const user = await prisma.user.create({
     data: {
       name,
       email,
       password: hashedPassword,
+      roles: {
+        create: {
+          role: {
+            connect: {
+              name: "DONATUR",
+            },
+          },
+        },
+      },
     },
   });
 
@@ -52,7 +67,6 @@ authRoute.post("/register", async (c) => {
         id: user.id,
         name: user.name,
         email: user.email,
-        role: user.role,
       },
     },
     201
@@ -64,39 +78,63 @@ authRoute.post("/register", async (c) => {
 // POST /api/auth/login
 // -------------------------------------------------------
 authRoute.post("/login", async (c) => {
-  const { email, password } = await c.req.json();
+  const body = await c.req.json();
 
   // Validate input
-  if (!email || !password) {
-    return c.json({ message: "Email dan password wajib diisi!" }, 400);
+  const result = loginSchema.safeParse(body);
+  if (!result.success) {
+    return c.json(
+      {
+        message: "Validasi gagal",
+        errors: result.error.flatten().fieldErrors,
+      },
+      400
+    );
   }
 
-  // Check if user exists
+  const { email, password } = result.data;
+
+  // Find user with roles and permissions
   const user = await prisma.user.findUnique({
     where: { email },
+    include: {
+      roles: {
+        include: {
+          role: {
+            include: {
+              permissions: {
+                include: {
+                  permission: true,
+                },
+              },
+            },
+          },
+        },
+      },
+    },
   });
 
   if (!user) {
-    return c.json({ message: "Email tidak ditemukan!" }, 404);
+    return c.json({ message: "Email atau password salah" }, 401);
   }
 
-  // Compare password
   const isPasswordValid = await bcrypt.compare(password, user.password);
-
   if (!isPasswordValid) {
-    return c.json({ message: "Password salah!" }, 401);
+    return c.json({ message: "Email atau password salah" }, 401);
   }
 
-  // Generate JWT token
-  const token = jwt.sign(
-    {
-      id: user.id,
-      email: user.email,
-      role: user.role,
-    },
-    process.env.JWT_SECRET as string,
-    { expiresIn: "7d" }
+  // Flatten permissions
+  const permissions = user.roles.flatMap((ur) =>
+    ur.role.permissions.map((rp) => rp.permission.action)
   );
+
+  // Take role names
+  const roles = user.roles.map((ur) => ur.role.name);
+
+  // Sign JWT
+  const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET as string, {
+    expiresIn: "7d",
+  });
 
   return c.json({
     message: "Login berhasil",
@@ -105,7 +143,8 @@ authRoute.post("/login", async (c) => {
       id: user.id,
       name: user.name,
       email: user.email,
-      role: user.role,
+      roles,
+      permissions,
     },
   });
 });
@@ -123,17 +162,52 @@ authRoute.get("/me", authenticate, async (c) => {
       id: true,
       name: true,
       email: true,
-      role: true,
       avatar: true,
       bio: true,
       verificationStatus: true,
       createdAt: true,
+      roles: {
+        select: {
+          role: {
+            select: {
+              name: true,
+              permissions: {
+                select: {
+                  permission: {
+                    select: {
+                      action: true,
+                    },
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
     },
   });
 
   if (!user) {
-    return c.json({ message: "User tidak ditemukan!" }, 404);
+    return c.json({ message: "User tidak ditemukan" }, 404);
   }
 
-  return c.json(user);
+  // Flatten for clarity in response
+  const roles = user.roles.map((ur) => ur.role.name);
+  const permissions = user.roles.flatMap((ur) =>
+    ur.role.permissions.map((rp) => rp.permission.action)
+  );
+
+  return c.json({
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      avatar: user.avatar,
+      bio: user.bio,
+      verificationStatus: user.verificationStatus,
+      createdAt: user.createdAt,
+      roles,
+      permissions,
+    },
+  });
 });

@@ -11,3 +11,7 @@ export const verifySchema = z.object({
 export const rejectVerificationSchema = z.object({
   reason: z.string().min(10, "Alasan penolakan minimal 10 karakter"),
 });
+
+export const getVerificationsQuerySchema = z.object({
+  status: z.enum(["PENDING", "APPROVED", "REJECTED"]).default("PENDING"),
+});

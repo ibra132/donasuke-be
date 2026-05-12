@@ -107,6 +107,9 @@ const PERMISSIONS = [
   // REPORT
   // ----------------------------------------------------------
 
+  // admin:access — gerbang masuk ke semua admin panel endpoint
+  { action: "admin:access", description: "Akses admin panel" },
+
   // report:create — user melaporkan campaign mencurigakan
   { action: "report:create", description: "Buat laporan campaign" },
 
@@ -156,6 +159,8 @@ const ROLE_PERMISSIONS = {
   ],
 
   ADMIN: [
+    // Admin panel access
+    "admin:access",
     // Campaign
     "campaign:view",
     "campaign:update:all",
@@ -260,7 +265,7 @@ async function main() {
   // ----------------------------------------------------------
   // 4. SEED ADMIN USER
   // ----------------------------------------------------------
-  const hashedPassword = await bcrypt.hash("viltrume123", 10);
+  const hashedPassword = await bcrypt.hash("viltrume123", 12);
 
   const adminUser = await prisma.user.upsert({
     where: { email: "admin@donasuke.com" },

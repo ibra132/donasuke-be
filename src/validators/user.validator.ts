@@ -1,17 +1,26 @@
-import { z } from "zod";
+import { z } from 'zod'
 
-export const verifySchema = z.object({
+export const updateProfileSchema = z.object({
+  name: z.string().min(3, 'Nama minimal 3 karakter').max(100, 'Nama maksimal 100 karakter').optional(),
+  bio: z.string().max(500, 'Bio maksimal 500 karakter').optional(),
+}).strict()
+
+export const verificationSchema = z.object({
   nik: z
     .string()
-    .length(16, "NIK harus 16 digit")
-    .regex(/^\d+$/, "NIK hanya boleh berisi angka"),
-  ktpUrl: z.string().url("Format URL KTP tidak valid"),
-});
+    .length(16, 'NIK harus 16 digit angka')
+    .regex(/^\d+$/, 'NIK harus 16 digit angka'),
+}).strict()
 
+// Konstanta validasi file avatar (validasi dilakukan di service)
+export const ALLOWED_AVATAR_TYPES = ['image/jpeg', 'image/png'] as const
+export const MAX_AVATAR_SIZE = 2 * 1024 * 1024 // 2MB
+
+// Dipakai admin
 export const rejectVerificationSchema = z.object({
-  reason: z.string().min(10, "Alasan penolakan minimal 10 karakter"),
-});
+  reason: z.string().min(10, 'Alasan minimal 10 karakter'),
+})
 
 export const getVerificationsQuerySchema = z.object({
-  status: z.enum(["PENDING", "APPROVED", "REJECTED"]).default("PENDING"),
-});
+  status: z.enum(['PENDING', 'APPROVED', 'REJECTED']).default('PENDING'),
+})

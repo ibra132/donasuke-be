@@ -1,65 +1,65 @@
-import { Hono } from "hono";
-import prisma from "../lib/prisma";
-import { authenticate, authorize } from "../middleware/auth.middleware";
-import { verifySchema } from "../validators/user.validator";
+import { Hono } from 'hono'
+import { authenticate } from '../middleware/auth.middleware'
+import { updateProfileSchema, verificationSchema } from '../validators/user.validator'
+import { getProfile, updateProfile, uploadAvatar, submitVerification } from '../services/user.service'
+import { successResponse, errorResponse } from '../utils/response'
 
-export const userRoute = new Hono();
+export const userRoute = new Hono()
 
-// -------------------------------------------------------
-// POST /api/users/me/verify
-// Submit verification to become a fundraiser
-// -------------------------------------------------------
-userRoute.post("/me/verify", authenticate, async (c) => {
-  const userId = c.get("userId");
-  const body = await c.req.json();
+// GET /api/users/me
+userRoute.get('/me', authenticate, async (c) => {
+  const { userId } = c.get('user')
+  const user = await getProfile(userId)
+  return successResponse(c, { user }, 'OK')
+})
 
-  const result = verifySchema.safeParse(body);
+// PATCH /api/users/me
+userRoute.patch('/me', authenticate, async (c) => {
+  const { userId } = c.get('user')
+  const body = await c.req.json()
+
+  const result = updateProfileSchema.safeParse(body)
   if (!result.success) {
-    return c.json(
-      {
-        message: "Validasi gagal",
-        errors: result.error.flatten().fieldErrors,
-      },
-      400
-    );
+    return errorResponse(c, 'Validasi gagal', 400,
+      result.error.issues.map((i) => ({ field: String(i.path[0] ?? ''), message: i.message }))
+    )
   }
 
-  const { nik, ktpUrl } = result.data;
+  const user = await updateProfile(userId, result.data)
+  return successResponse(c, { user }, 'Profil berhasil diperbarui')
+})
 
-  // Check verification status
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  });
+// POST /api/users/me/avatar
+userRoute.post('/me/avatar', authenticate, async (c) => {
+  const { userId } = c.get('user')
+  const body = await c.req.parseBody()
+  const file = body['avatar']
 
-  if (!user) {
-    return c.json({ message: "User tidak ditemukan" }, 404);
+  if (!(file instanceof File)) {
+    return errorResponse(c, 'File avatar diperlukan', 400)
   }
 
-  // Check if user is already a fundraiser
-  if (user.verificationStatus === "APPROVED") {
-    return c.json(
-      { message: "Akun anda sudah terverifikasi sebagai fundraiser" },
-      400
-    );
+  const avatarUrl = await uploadAvatar(userId, file)
+  return successResponse(c, { avatarUrl }, 'Avatar berhasil diperbarui')
+})
+
+// POST /api/users/me/verification
+userRoute.post('/me/verification', authenticate, async (c) => {
+  const { userId } = c.get('user')
+  const body = await c.req.parseBody()
+
+  const result = verificationSchema.safeParse({ nik: body['nik'] })
+  if (!result.success) {
+    return errorResponse(c, 'Validasi gagal', 400,
+      result.error.issues.map((i) => ({ field: String(i.path[0] ?? ''), message: i.message }))
+    )
   }
 
-  // Check if user has already submitted verification
-  if (user.verificationStatus === "PENDING") {
-    return c.json(
-      { message: "Pengajuan anda sedang dalam proses review" },
-      400
-    );
+  const ktpFile = body['ktpFile']
+  if (!(ktpFile instanceof File)) {
+    return errorResponse(c, 'File KTP diperlukan', 400)
   }
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      nik,
-      ktpUrl,
-      verificationStatus: "PENDING",
-      verificationRejectReason: null,
-    },
-  });
-
-  return c.json({ message: "Pengajuan verifikasi berhasil dikirim" });
-});
+  const data = await submitVerification(userId, result.data.nik, ktpFile)
+  return successResponse(c, data, 'Verifikasi berhasil disubmit, menunggu review admin')
+})

@@ -7,6 +7,7 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "tsx watch src/index.ts",
     "seed": "tsx prisma/seed.ts",
+    "setup:storage": "tsx scripts/setup-storage.ts",
     "build": "tsc",
     "start": "node dist/index.js"
   },
@@ -17,10 +18,12 @@
   "dependencies": {
     "@hono/node-server": "^2.0.0",
     "@prisma/client": "^6.19.3",
+    "@supabase/supabase-js": "^2.105.4",
     "bcryptjs": "^3.0.3",
     "dotenv": "^17.4.2",
     "hono": "^4.12.15",
     "jsonwebtoken": "^9.0.3",
+    "midtrans-client": "^1.4.3",
     "prisma": "^6.19.3",
     "zod": "^4.4.3"
   },

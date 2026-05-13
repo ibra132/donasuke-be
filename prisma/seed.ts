@@ -21,6 +21,9 @@ const PERMISSIONS = [
   // campaign:create — membuat campaign baru (khusus fundraiser)
   { action: "campaign:create", description: "Buat campaign baru" },
 
+  // campaign:submit — submit campaign DRAFT ke PENDING_REVIEW
+  { action: "campaign:submit", description: "Submit campaign untuk review" },
+
   // campaign:update:own — edit campaign milik sendiri (fundraiser)
   // dipisah dari update:all agar fundraiser tidak bisa edit campaign orang lain
   { action: "campaign:update:own", description: "Edit campaign milik sendiri" },
@@ -152,6 +155,7 @@ const ROLE_PERMISSIONS = {
     "report:create",
     // Tambahan privilege FUNDRAISER
     "campaign:create",
+    "campaign:submit",
     "campaign:update:own",
     "campaign:close",
     "withdrawal:request",

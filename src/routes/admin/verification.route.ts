@@ -9,12 +9,10 @@ export const verificationRoute = new Hono();
 
 // -------------------------------------------------------
 // GET /api/admin/verifications
-// All verifications for admin review
 // -------------------------------------------------------
 verificationRoute.get("/", async (c) => {
   const query = c.req.query();
 
-  //   Validate query parameters
   const result = getVerificationsQuerySchema.safeParse(query);
   if (!result.success) {
     return c.json(
@@ -48,7 +46,6 @@ verificationRoute.get("/", async (c) => {
 
 // -------------------------------------------------------
 // PATCH /api/admin/verifications/:id/approve
-// Approve a verification request
 // -------------------------------------------------------
 verificationRoute.patch("/:id/approve", async (c) => {
   const userId = c.req.param("id");
@@ -109,7 +106,6 @@ verificationRoute.patch("/:id/reject", async (c) => {
   const userId = c.req.param("id");
   const body = await c.req.json();
 
-  //   Validate input
   const result = rejectVerificationSchema.safeParse(body);
   if (!result.success) {
     return c.json(

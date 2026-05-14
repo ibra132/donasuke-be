@@ -58,8 +58,6 @@ authRoute.post("/login", async (c) => {
   return successResponse(c, { user, token }, "Login berhasil");
 });
 
-// ── Protected
-
 // -------------------------------------------------------
 // GET /api/auth/me
 // -------------------------------------------------------

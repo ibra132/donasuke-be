@@ -73,12 +73,16 @@ export async function createCampaign(
   });
 }
 
-export async function getCampaigns(filter: GetCampaignsFilter = {}) {
+export async function getCampaigns(
+  filter: GetCampaignsFilter = {},
+  userId?: string
+) {
   const { category, status = "ACTIVE", search, page = 1, limit = 12 } = filter;
   const skip = (page - 1) * limit;
 
   const where = {
-    status: status as any,
+    ...(userId && { userId }),
+    ...(status && { status: status as any }),
     ...(category && { category }),
     ...(search && {
       OR: [

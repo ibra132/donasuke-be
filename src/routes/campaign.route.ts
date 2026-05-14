@@ -34,8 +34,6 @@ import { successResponse, errorResponse } from "../utils/response";
 
 export const campaignRoute = new Hono();
 
-// ── Public
-
 // -------------------------------------------------------
 // GET /api/campaigns
 // -------------------------------------------------------
@@ -57,6 +55,34 @@ campaignRoute.get("/", async (c) => {
 
   return successResponse(c, result, "OK");
 });
+
+// -------------------------------------------------------
+// GET /api/campaign/mine
+// -------------------------------------------------------
+campaignRoute.get(
+  "/mine",
+  authenticate,
+  requirePermission("campaign:view:own"),
+  async (c) => {
+    const { userId } = c.get("user");
+    const query = getCampaignsQuerySchema.safeParse(c.req.query());
+    if (!query.success) {
+      return errorResponse(
+        c,
+        "Query tidak valid",
+        400,
+        query.error.issues.map((i) => ({
+          field: String(i.path[0] ?? ""),
+          message: i.message,
+        }))
+      );
+    }
+
+    const result = await getCampaigns(query.data, userId);
+
+    return successResponse(c, result, "OK");
+  }
+);
 
 // -------------------------------------------------------
 // GET /api/campaigns/saved
@@ -122,8 +148,6 @@ campaignRoute.get("/:id/donations", async (c) => {
 
   return successResponse(c, result, "OK");
 });
-
-// ── Protected
 
 // -------------------------------------------------------
 // POST /api/campaigns

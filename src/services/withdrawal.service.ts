@@ -1,5 +1,5 @@
 import prisma from "../lib/prisma";
-import { uploadFile, BUCKETS } from "./storage.service";
+import { uploadFile, BUCKETS, getSignedUrl } from "./storage.service";
 import { AppError } from "../utils/error";
 import { WITHDRAWAL_ADMIN_FEE } from "../utils/constants";
 
@@ -24,6 +24,7 @@ const withdrawalBaseSelect = {
   bankAccount: true,
   accountHolder: true,
   note: true,
+  proofUrl: true,
   createdAt: true,
 };
 
@@ -213,6 +214,7 @@ export async function markWithdrawalPaid(
   withdrawalId: string,
   proofFile: File
 ) {
+  const WITHDRAWAL_PROOF_SIGNED_URL_EXPIRY = 60 * 60 * 24;
   const ALLOWED = ["image/jpeg", "image/png", "application/pdf"];
   const MAX_SIZE = 10 * 1024 * 1024;
 
@@ -225,13 +227,13 @@ export async function markWithdrawalPaid(
   if (proofFile.size > MAX_SIZE)
     throw new AppError(400, "Ukuran file maksimal 10MB");
 
-  const withdrawal = await prisma.withdrawal.findUnique({
+  const existing = await prisma.withdrawal.findUnique({
     where: { id: withdrawalId },
   });
 
-  if (!withdrawal) throw new AppError(404, "Penarikan tidak ditemukan");
+  if (!existing) throw new AppError(404, "Penarikan tidak ditemukan");
 
-  if (withdrawal.status !== "APPROVED")
+  if (existing.status !== "APPROVED")
     throw new AppError(
       422,
       "Hanya penarikan berstatus APPROVED yang bisa di-mark PAID"
@@ -239,16 +241,25 @@ export async function markWithdrawalPaid(
 
   const ext = proofFile.name.split(".").pop() ?? "bin";
   const path = `${withdrawalId}/${Date.now()}.${ext}`;
-  const proofUrl = await uploadFile(
+
+  await uploadFile(
     BUCKETS.WITHDRAWAL_PROOF,
     path,
     await proofFile.arrayBuffer(),
     proofFile.type
   );
 
-  return prisma.withdrawal.update({
+  const withdrawal = await prisma.withdrawal.update({
     where: { id: withdrawalId },
-    data: { status: "PAID", proofUrl },
+    data: { status: "PAID", proofUrl: path },
     select: withdrawalAdminSelect,
   });
+
+  const proofSignedUrl = await getSignedUrl(
+    BUCKETS.WITHDRAWAL_PROOF,
+    path,
+    WITHDRAWAL_PROOF_SIGNED_URL_EXPIRY
+  );
+
+  return { ...withdrawal, proofUrl: proofSignedUrl };
 }

@@ -25,6 +25,8 @@ import {
   editCampaignUpdate,
   deleteCampaignUpdate,
 } from "../services/campaign.service";
+import { getCampaignDonations } from "../services/donation.service";
+import { getCampaignDonationsQuerySchema } from "../validators/donation.validator";
 import { successResponse, errorResponse } from "../utils/response";
 
 export const campaignRoute = new Hono();
@@ -80,6 +82,29 @@ campaignRoute.get("/:id/updates", async (c) => {
   const updates = await getCampaignUpdates(c.req.param("id"));
 
   return successResponse(c, { updates }, "OK");
+});
+
+// -------------------------------------------------------
+// GET /api/campaigns/:id/donations — donasi SUCCESS (publik)
+// -------------------------------------------------------
+campaignRoute.get("/:id/donations", async (c) => {
+  const query = getCampaignDonationsQuerySchema.safeParse(c.req.query());
+
+  if (!query.success) {
+    return errorResponse(
+      c,
+      "Query tidak valid",
+      400,
+      query.error.issues.map((i) => ({
+        field: String(i.path[0] ?? ""),
+        message: i.message,
+      }))
+    );
+  }
+
+  const result = await getCampaignDonations(c.req.param("id"), query.data);
+
+  return successResponse(c, result, "OK");
 });
 
 // ── Protected

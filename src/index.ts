@@ -11,6 +11,7 @@ import { adminRoute } from './routes/admin'
 import { campaignRoute } from './routes/campaign.route'
 import { donationRoute } from './routes/donation.route'
 import { withdrawalRoute } from './routes/withdrawal.route'
+import { webhookRoute } from './routes/webhook.route'
 
 const app = new Hono()
 
@@ -21,6 +22,7 @@ app.route('/api/admin', adminRoute)
 app.route('/api/campaigns', campaignRoute)
 app.route('/api/donations', donationRoute)
 app.route('/api/withdrawals', withdrawalRoute)
+app.route('/api/webhooks', webhookRoute)
 
 app.get('/health', (c) => c.json({ status: 'ok' }))
 

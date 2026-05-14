@@ -125,8 +125,9 @@ export async function handleMidtransWebhook(payload: MidtransNotification) {
 
   if (!donation) return;
 
-  // Idempotency — sudah diproses sebelumnya, skip
-  if (donation.status === "SUCCESS") return;
+  // Idempotency check
+  const FINAL_STATUSES = ["SUCCESS", "EXPIRED", "FAILED"];
+  if (FINAL_STATUSES.includes(donation.status)) return;
 
   if (transaction_status === "settlement" || transaction_status === "capture") {
     await prisma.$transaction(async (tx) => {
@@ -218,10 +219,13 @@ export async function getCampaignDonations(
   const where = { campaignId, status: "SUCCESS" as const };
 
   const orderBy =
-    sort === "oldest" ? { createdAt: "asc" as const } :
-    sort === "largest" ? { amount: "desc" as const } :
-    sort === "smallest" ? { amount: "asc" as const } :
-    { createdAt: "desc" as const };
+    sort === "oldest"
+      ? { createdAt: "asc" as const }
+      : sort === "largest"
+      ? { amount: "desc" as const }
+      : sort === "smallest"
+      ? { amount: "asc" as const }
+      : { createdAt: "desc" as const };
 
   const [donations, total] = await prisma.$transaction([
     prisma.donation.findMany({

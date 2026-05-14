@@ -23,4 +23,6 @@ export const rejectVerificationSchema = z.object({
 
 export const getVerificationsQuerySchema = z.object({
   status: z.enum(['PENDING', 'APPROVED', 'REJECTED']).default('PENDING'),
+  page: z.coerce.number().int().min(1).default(1),
+  limit: z.coerce.number().int().min(1).max(100).default(20),
 })

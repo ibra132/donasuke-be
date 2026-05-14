@@ -1,143 +1,92 @@
 import { Hono } from "hono";
-import prisma from "../../lib/prisma";
+import { requirePermission } from "../../middleware/rbac.middleware";
 import {
   getVerificationsQuerySchema,
   rejectVerificationSchema,
 } from "../../validators/user.validator";
+import {
+  getVerifications,
+  getVerificationDetail,
+  approveVerification,
+  rejectVerification,
+} from "../../services/user.service";
+import { successResponse, errorResponse } from "../../utils/response";
 
 export const verificationRoute = new Hono();
 
 // -------------------------------------------------------
-// GET /api/admin/verifications
+// GET /api/admin/verifications?status=PENDING&page=1&limit=20
 // -------------------------------------------------------
 verificationRoute.get("/", async (c) => {
-  const query = c.req.query();
+  const query = getVerificationsQuerySchema.safeParse(c.req.query());
 
-  const result = getVerificationsQuerySchema.safeParse(query);
-  if (!result.success) {
-    return c.json(
-      {
-        message: "Validasi gagal",
-        errors: result.error.flatten().fieldErrors,
-      },
-      400
+  if (!query.success) {
+    return errorResponse(
+      c,
+      "Query tidak valid",
+      400,
+      query.error.issues.map((i) => ({
+        field: String(i.path[0] ?? ""),
+        message: i.message,
+      }))
     );
   }
 
-  const { status } = result.data;
+  const { status, page, limit } = query.data;
+  const result = await getVerifications(status, page, limit);
 
-  const verifications = await prisma.user.findMany({
-    where: { verificationStatus: status },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      nik: true,
-      ktpUrl: true,
-      verificationStatus: true,
-      verificationRejectReason: true,
-      createdAt: true,
-    },
-    orderBy: { createdAt: "asc" },
-  });
-
-  return c.json({ verifications });
+  return successResponse(c, result, "OK");
 });
 
 // -------------------------------------------------------
-// PATCH /api/admin/verifications/:id/approve
+// GET /api/admin/verifications/:id
 // -------------------------------------------------------
-verificationRoute.patch("/:id/approve", async (c) => {
-  const userId = c.req.param("id");
-
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  });
-
-  if (!user) {
-    return c.json({ message: "User tidak ditemukan" }, 404);
-  }
-
-  if (user.verificationStatus !== "PENDING") {
-    return c.json({ message: "Pengajuan ini sudah diproses sebelumnya" }, 400);
-  }
-
-  const fundraiserRole = await prisma.role.findUnique({
-    where: { name: "FUNDRAISER" },
-  });
-
-  if (!fundraiserRole) {
-    return c.json({ message: "Role FUNDRAISER tidak ditemukan" }, 500);
-  }
-
-  await prisma.$transaction([
-    prisma.user.update({
-      where: { id: userId },
-      data: {
-        verificationStatus: "APPROVED",
-        verificationRejectReason: null,
-      },
-    }),
-    prisma.userRole.upsert({
-      where: {
-        userId_roleId: {
-          userId,
-          roleId: fundraiserRole.id,
-        },
-      },
-      update: {},
-      create: {
-        userId,
-        roleId: fundraiserRole.id,
-      },
-    }),
-  ]);
-
-  return c.json({
-    message:
-      "Pengajuan verifikasi berhasil disetujui, pengguna sekarang adalah fundraiser",
-  });
+verificationRoute.get("/:id", async (c) => {
+  const user = await getVerificationDetail(c.req.param("id"));
+  return successResponse(c, { user }, "OK");
 });
 
 // -------------------------------------------------------
-// PATCH /api/admin/verifications/:id/reject
+// POST /api/admin/verifications/:id/approve
 // -------------------------------------------------------
-verificationRoute.patch("/:id/reject", async (c) => {
-  const userId = c.req.param("id");
-  const body = await c.req.json();
+verificationRoute.post(
+  "/:id/approve",
+  requirePermission("user:verify"),
+  async (c) => {
+    await approveVerification(c.req.param("id"));
 
-  const result = rejectVerificationSchema.safeParse(body);
-  if (!result.success) {
-    return c.json(
-      {
-        message: "Validasi gagal",
-        errors: result.error.flatten().fieldErrors,
-      },
-      400
+    return successResponse(
+      c,
+      null,
+      "Verifikasi disetujui. User sekarang dapat membuat campaign."
     );
   }
+);
 
-  const { reason } = result.data;
+// -------------------------------------------------------
+// POST /api/admin/verifications/:id/reject
+// -------------------------------------------------------
+verificationRoute.post(
+  "/:id/reject",
+  requirePermission("user:reject-verification"),
+  async (c) => {
+    const body = await c.req.json();
+    const result = rejectVerificationSchema.safeParse(body);
 
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-  });
+    if (!result.success) {
+      return errorResponse(
+        c,
+        "Validasi gagal",
+        400,
+        result.error.issues.map((i) => ({
+          field: String(i.path[0] ?? ""),
+          message: i.message,
+        }))
+      );
+    }
 
-  if (!user) {
-    return c.json({ message: "User tidak ditemukan" }, 404);
+    await rejectVerification(c.req.param("id"), result.data.reason);
+
+    return successResponse(c, null, "Verifikasi berhasil ditolak");
   }
-
-  if (user.verificationStatus !== "PENDING") {
-    return c.json({ message: "Pengajuan ini sudah diproses sebelumnya" }, 400);
-  }
-
-  await prisma.user.update({
-    where: { id: userId },
-    data: {
-      verificationStatus: "REJECTED",
-      verificationRejectReason: reason,
-    },
-  });
-
-  return c.json({ message: "Pengajuan berhasil direject" });
-});
+);

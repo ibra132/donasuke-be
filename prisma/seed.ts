@@ -79,8 +79,12 @@ const PERMISSIONS = [
   { action: "user:update:own", description: "Edit profil sendiri" },
   { action: "user:update:all", description: "Edit semua profil user" },
 
-  // user:verify — admin memverifikasi pengajuan fundraiser
-  { action: "user:verify", description: "Verifikasi pengajuan fundraiser" },
+  // user:verify — admin menyetujui pengajuan verifikasi fundraiser
+  { action: "user:verify", description: "Setujui verifikasi fundraiser" },
+
+  // user:reject-verification — admin menolak pengajuan verifikasi
+  // dipisah dari user:verify agar bisa dikontrol lebih granular
+  { action: "user:reject-verification", description: "Tolak verifikasi fundraiser" },
 
   // ----------------------------------------------------------
   // WITHDRAWAL
@@ -178,6 +182,7 @@ const ROLE_PERMISSIONS = {
     "user:view:all",
     "user:update:all",
     "user:verify",
+    "user:reject-verification",
     // Withdrawal
     "withdrawal:view:all",
     "withdrawal:approve",

@@ -1,5 +1,5 @@
 import prisma from "../lib/prisma";
-import { uploadFile, deleteFile, BUCKETS } from "./storage.service";
+import { uploadFile, deleteFile, getSignedUrl, BUCKETS } from "./storage.service";
 import { AppError } from "../utils/error";
 import {
   ALLOWED_AVATAR_TYPES,
@@ -152,4 +152,110 @@ export async function submitVerification(
   });
 
   return { nik, verificationStatus: "PENDING" as const };
+}
+
+// ── Admin ─────────────────────────────────────────────────────
+
+const KTP_SIGNED_URL_EXPIRY = 3600; // 1 jam
+
+export async function getVerifications(
+  status: "PENDING" | "APPROVED" | "REJECTED" = "PENDING",
+  page = 1,
+  limit = 20
+) {
+  const skip = (page - 1) * limit;
+  const where = { verificationStatus: status };
+
+  const [data, total] = await prisma.$transaction([
+    prisma.user.findMany({
+      where,
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        verificationStatus: true,
+        verificationRejectReason: true,
+        createdAt: true,
+      },
+      orderBy: { createdAt: "asc" },
+      skip,
+      take: limit,
+    }),
+    prisma.user.count({ where }),
+  ]);
+
+  return { data, total, page, limit };
+}
+
+export async function getVerificationDetail(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      nik: true,
+      ktpUrl: true,
+      verificationStatus: true,
+      verificationRejectReason: true,
+      createdAt: true,
+    },
+  });
+
+  if (!user) throw new AppError(404, "User tidak ditemukan");
+
+  const { ktpUrl, ...rest } = user;
+  const ktpSignedUrl = ktpUrl
+    ? await getSignedUrl(BUCKETS.KTP, ktpUrl, KTP_SIGNED_URL_EXPIRY)
+    : null;
+
+  return { ...rest, ktpUrl: ktpSignedUrl };
+}
+
+export async function approveVerification(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { verificationStatus: true },
+  });
+
+  if (!user) throw new AppError(404, "User tidak ditemukan");
+
+  if (user.verificationStatus !== "PENDING")
+    throw new AppError(422, "Pengajuan ini sudah diproses sebelumnya");
+
+  const fundraiserRole = await prisma.role.findUnique({
+    where: { name: "FUNDRAISER" },
+  });
+
+  if (!fundraiserRole)
+    throw new AppError(500, "Role FUNDRAISER tidak ditemukan di database");
+
+  await prisma.$transaction([
+    prisma.user.update({
+      where: { id: userId },
+      data: { verificationStatus: "APPROVED", verificationRejectReason: null },
+    }),
+    prisma.userRole.upsert({
+      where: { userId_roleId: { userId, roleId: fundraiserRole.id } },
+      update: {},
+      create: { userId, roleId: fundraiserRole.id },
+    }),
+  ]);
+}
+
+export async function rejectVerification(userId: string, reason: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { verificationStatus: true },
+  });
+
+  if (!user) throw new AppError(404, "User tidak ditemukan");
+
+  if (user.verificationStatus !== "PENDING")
+    throw new AppError(422, "Pengajuan ini sudah diproses sebelumnya");
+
+  await prisma.user.update({
+    where: { id: userId },
+    data: { verificationStatus: "REJECTED", verificationRejectReason: reason },
+  });
 }

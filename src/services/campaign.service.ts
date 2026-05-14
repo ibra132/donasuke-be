@@ -588,6 +588,29 @@ export async function closeCampaign(campaignId: string) {
   });
 }
 
+export async function reportCampaign(
+  userId: string,
+  campaignId: string,
+  reason: string
+) {
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+  });
+
+  if (!campaign) throw new AppError(404, "Campaign tidak ditemukan");
+
+  const existing = await prisma.report.findFirst({
+    where: { userId, campaignId },
+  });
+
+  if (existing) throw new AppError(409, "Anda sudah melaporkan campaign ini");
+
+  return prisma.report.create({
+    data: { userId, campaignId, reason },
+    select: { id: true, reason: true, createdAt: true },
+  });
+}
+
 export async function recalculateCollectedAmount(campaignId: string) {
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },

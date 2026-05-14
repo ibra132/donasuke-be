@@ -15,7 +15,7 @@ import { successResponse, errorResponse } from "../utils/response";
 export const donationRoute = new Hono();
 
 // -------------------------------------------------------
-// GET /api/donations — riwayat donasi user sendiri
+// GET /api/donations
 // -------------------------------------------------------
 donationRoute.get(
   "/",
@@ -37,14 +37,18 @@ donationRoute.get(
       );
     }
 
-    const result = await getMyDonations(userId, query.data.page, query.data.limit);
+    const result = await getMyDonations(
+      userId,
+      query.data.page,
+      query.data.limit
+    );
 
     return successResponse(c, result, "OK");
   }
 );
 
 // -------------------------------------------------------
-// GET /api/donations/:id — detail donasi (owner only)
+// GET /api/donations/:id
 // -------------------------------------------------------
 donationRoute.get("/:id", authenticate, async (c) => {
   const { userId } = c.get("user");
@@ -54,7 +58,7 @@ donationRoute.get("/:id", authenticate, async (c) => {
 });
 
 // -------------------------------------------------------
-// POST /api/donations — buat donasi + Midtrans Snap token
+// POST /api/donations
 // -------------------------------------------------------
 donationRoute.post(
   "/",

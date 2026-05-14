@@ -90,6 +90,7 @@ adminCampaignRoute.post(
 // -------------------------------------------------------
 adminCampaignRoute.post("/:id/close", async (c) => {
   const campaign = await closeCampaign(c.req.param("id"));
+
   return successResponse(c, { campaign }, "Campaign berhasil ditutup");
 });
 

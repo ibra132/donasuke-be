@@ -37,6 +37,7 @@ export async function uploadFile(
   if (isPrivate) return path;
 
   const { data } = getSupabaseClient().storage.from(bucket).getPublicUrl(path);
+
   return data.publicUrl;
 }
 
@@ -56,5 +57,6 @@ export async function getSignedUrl(
     .storage.from(bucket)
     .createSignedUrl(path, expiresIn);
   if (error || !data) throw new AppError(500, "Gagal membuat signed URL");
+
   return data.signedUrl;
 }

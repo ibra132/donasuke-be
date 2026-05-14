@@ -6,6 +6,7 @@ import {
   updateCampaignSchema,
   addCampaignUpdateSchema,
   getCampaignsQuerySchema,
+  createReportSchema,
 } from "../validators/campaign.validator";
 import {
   addCampaignDocument,
@@ -24,6 +25,7 @@ import {
   getCampaignUpdates,
   editCampaignUpdate,
   deleteCampaignUpdate,
+  reportCampaign,
 } from "../services/campaign.service";
 import { getCampaignDonations } from "../services/donation.service";
 import { getCampaignDonationsQuerySchema } from "../validators/donation.validator";
@@ -85,7 +87,7 @@ campaignRoute.get("/:id/updates", async (c) => {
 });
 
 // -------------------------------------------------------
-// GET /api/campaigns/:id/donations — donasi SUCCESS (publik)
+// GET /api/campaigns/:id/donations?page=1&limit=10&sort=newest
 // -------------------------------------------------------
 campaignRoute.get("/:id/donations", async (c) => {
   const query = getCampaignDonationsQuerySchema.safeParse(c.req.query());
@@ -378,12 +380,13 @@ campaignRoute.patch(
   async (c) => {
     const { userId } = c.get("user");
     const body = await c.req.parseBody();
-    const newFile = body["document"];
+
     const documentType =
       typeof body["documentType"] === "string"
         ? body["documentType"]
         : undefined;
 
+    const newFile = body["document"];
     if (!(newFile instanceof File)) {
       return errorResponse(c, "File dokumen diperlukan", 400);
     }
@@ -429,5 +432,39 @@ campaignRoute.post(
       : "Campaign dihapus dari simpanan";
 
     return successResponse(c, result, msg);
+  }
+);
+
+// -------------------------------------------------------
+// POST /api/campaigns/:id/report
+// -------------------------------------------------------
+campaignRoute.post(
+  "/:id/report",
+  authenticate,
+  requirePermission("report:create"),
+  async (c) => {
+    const { userId } = c.get("user");
+    const body = await c.req.json();
+
+    const result = createReportSchema.safeParse(body);
+    if (!result.success) {
+      return errorResponse(
+        c,
+        "Validasi gagal",
+        400,
+        result.error.issues.map((i) => ({
+          field: String(i.path[0] ?? ""),
+          message: i.message,
+        }))
+      );
+    }
+
+    const report = await reportCampaign(
+      userId,
+      c.req.param("id"),
+      result.data.reason
+    );
+
+    return successResponse(c, { report }, "Laporan berhasil dikirim", 201);
   }
 );

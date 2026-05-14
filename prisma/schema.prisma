@@ -214,4 +214,6 @@ model Report {
 
   user     User     @relation(fields: [userId], references: [id])
   campaign Campaign @relation(fields: [campaignId], references: [id])
+
+  @@unique([userId, campaignId])
 }

@@ -14,9 +14,11 @@ const PERMISSIONS = [
   // CAMPAIGN
   // ----------------------------------------------------------
 
-  // campaign:view — melihat campaign (public, tapi tetap didefinisikan
-  // agar bisa dikontrol jika suatu saat campaign dijadikan private)
-  { action: "campaign:view", description: "Lihat campaign" },
+  // campaign:view:own — melihat campaign milik sendiri (fundraiser)
+  {
+    action: "campaign:view:own",
+    description: "Lihat campaign milik sendiri",
+  },
 
   // campaign:create — membuat campaign baru (khusus fundraiser)
   { action: "campaign:create", description: "Buat campaign baru" },
@@ -84,7 +86,10 @@ const PERMISSIONS = [
 
   // user:reject-verification — admin menolak pengajuan verifikasi
   // dipisah dari user:verify agar bisa dikontrol lebih granular
-  { action: "user:reject-verification", description: "Tolak verifikasi fundraiser" },
+  {
+    action: "user:reject-verification",
+    description: "Tolak verifikasi fundraiser",
+  },
 
   // ----------------------------------------------------------
   // WITHDRAWAL
@@ -137,7 +142,6 @@ const PERMISSIONS = [
 
 const ROLE_PERMISSIONS = {
   DONATUR: [
-    "campaign:view",
     "saved-campaign:create",
     "saved-campaign:delete",
     "donation:create",
@@ -149,7 +153,6 @@ const ROLE_PERMISSIONS = {
 
   FUNDRAISER: [
     // Semua yang bisa dilakukan DONATUR
-    "campaign:view",
     "saved-campaign:create",
     "saved-campaign:delete",
     "donation:create",
@@ -158,6 +161,7 @@ const ROLE_PERMISSIONS = {
     "user:update:own",
     "report:create",
     // Tambahan privilege FUNDRAISER
+    "campaign:view:own",
     "campaign:create",
     "campaign:submit",
     "campaign:update:own",
@@ -170,7 +174,6 @@ const ROLE_PERMISSIONS = {
     // Admin panel access
     "admin:access",
     // Campaign
-    "campaign:view",
     "campaign:update:all",
     "campaign:approve",
     "campaign:reject",

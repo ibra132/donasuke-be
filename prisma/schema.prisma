@@ -120,8 +120,9 @@ model Campaign {
   category        String
   description     String
   targetAmount    Float
-  collectedAmount Float          @default(0)
-  imageUrl        String?
+  collectedAmount  Float          @default(0)
+  availableBalance Float          @default(0)
+  imageUrl         String?
   status          CampaignStatus @default(DRAFT)
   deadline        DateTime
   location        String?

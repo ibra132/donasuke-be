@@ -21,6 +21,11 @@ type GetCampaignsFilter = {
   limit?: number;
 };
 
+type GetSavedCampaignsFilter = {
+  page?: number;
+  limit?: number;
+};
+
 const campaignPublicSelect = {
   id: true,
   title: true,
@@ -41,20 +46,6 @@ export async function createCampaign(
   data: CreateCampaignInput,
   imageFile?: File
 ) {
-  const user = await prisma.user.findUnique({
-    where: { id: userId },
-    select: { verificationStatus: true },
-  });
-
-  if (!user) throw new AppError(404, "User tidak ditemukan");
-
-  if (user.verificationStatus !== "APPROVED") {
-    throw new AppError(
-      403,
-      "Akun belum terverifikasi. Verifikasi identitas terlebih dahulu"
-    );
-  }
-
   let imageUrl: string | undefined;
 
   if (imageFile) {
@@ -289,6 +280,7 @@ export async function getCampaignDocuments(campaignId: string, userId: string) {
     where: { id: campaignId },
   });
   if (!campaign) throw new AppError(404, "Campaign tidak ditemukan");
+
   if (campaign.userId !== userId)
     throw new AppError(403, "Bukan campaign milik Anda");
 
@@ -383,17 +375,15 @@ export async function deleteCampaignDocument(docId: string, userId: string) {
 }
 
 export async function getCampaignUpdates(campaignId: string) {
-  const campaign = await prisma.campaign.findUnique({
-    where: { id: campaignId },
-  });
-
-  if (!campaign) throw new AppError(404, "Campaign tidak ditemukan");
-
-  return prisma.campaignUpdate.findMany({
+  const updates = await prisma.campaignUpdate.findMany({
     where: { campaignId },
     select: { id: true, content: true, createdAt: true },
     orderBy: { createdAt: "asc" },
   });
+
+  if (!updates) throw new AppError(404, "Campaign tidak ditemukan");
+
+  return updates;
 }
 
 export async function addCampaignUpdate(
@@ -494,14 +484,25 @@ export async function toggleSaveCampaign(userId: string, campaignId: string) {
   return { saved: true };
 }
 
-export async function getSavedCampaigns(userId: string) {
-  const saved = await prisma.savedCampaign.findMany({
-    where: { userId },
-    select: { campaign: { select: campaignPublicSelect } },
-    orderBy: { createdAt: "desc" },
-  });
+export async function getSavedCampaigns(
+  userId: string,
+  filter: GetSavedCampaignsFilter
+) {
+  const { page = 1, limit = 12 } = filter;
+  const skip = (page - 1) * limit;
 
-  return saved.map((s) => s.campaign);
+  const [data, total] = await prisma.$transaction([
+    prisma.savedCampaign.findMany({
+      where: { userId },
+      select: { campaign: { select: campaignPublicSelect } },
+      orderBy: { createdAt: "desc" },
+      skip,
+      take: limit,
+    }),
+    prisma.savedCampaign.count({ where: { userId } }),
+  ]);
+
+  return { data: data.map((d) => d.campaign), total, page, limit };
 }
 
 export async function getPendingCampaigns(page = 1, limit = 12) {

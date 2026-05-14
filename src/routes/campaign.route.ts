@@ -7,6 +7,7 @@ import {
   addCampaignUpdateSchema,
   getCampaignsQuerySchema,
   createReportSchema,
+  getSavedCampaignsQuerySchema,
 } from "../validators/campaign.validator";
 import {
   addCampaignDocument,
@@ -62,10 +63,23 @@ campaignRoute.get("/", async (c) => {
 // -------------------------------------------------------
 campaignRoute.get("/saved", authenticate, async (c) => {
   const { userId } = c.get("user");
+  const query = getSavedCampaignsQuerySchema.safeParse(c.req.query());
 
-  const campaigns = await getSavedCampaigns(userId);
+  if (!query.success) {
+    return errorResponse(
+      c,
+      "Query tidak valid",
+      400,
+      query.error.issues.map((i) => ({
+        field: String(i.path[0] ?? ""),
+        message: i.message,
+      }))
+    );
+  }
 
-  return successResponse(c, { campaigns }, "OK");
+  const campaigns = await getSavedCampaigns(userId, query.data);
+
+  return successResponse(c, campaigns, "OK");
 });
 
 // -------------------------------------------------------

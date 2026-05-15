@@ -28,7 +28,6 @@ const withdrawalBaseSelect = {
   createdAt: true,
 };
 
-// ── User-facing ───────────────────────────────────────────────
 export async function createWithdrawal(
   userId: string,
   data: CreateWithdrawalInput
@@ -125,6 +124,7 @@ export async function getWithdrawalById(id: string, userId: string) {
       campaign: { select: { id: true, title: true } },
     },
   });
+
   if (!withdrawal) throw new AppError(404, "Penarikan tidak ditemukan");
 
   if (withdrawal.userId !== userId)
@@ -135,11 +135,8 @@ export async function getWithdrawalById(id: string, userId: string) {
   return safe;
 }
 
-// ── Admin ─────────────────────────────────────────────────────
-
 const withdrawalAdminSelect = {
   ...withdrawalBaseSelect,
-  proofUrl: true,
   campaign: { select: { id: true, title: true } },
   user: { select: { id: true, name: true, email: true } },
 };

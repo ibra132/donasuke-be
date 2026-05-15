@@ -27,6 +27,7 @@ import {
   editCampaignUpdate,
   deleteCampaignUpdate,
   reportCampaign,
+  getCampaignDocumentUrl,
 } from "../services/campaign.service";
 import { getCampaignDonations } from "../services/donation.service";
 import { getCampaignDonationsQuerySchema } from "../validators/donation.validator";
@@ -371,6 +372,20 @@ campaignRoute.get(
     return successResponse(c, { documents: docs }, "OK");
   }
 );
+
+// -------------------------------------------------------
+// GET /api/campaigns/documents/:documentId/url
+// -------------------------------------------------------
+campaignRoute.get("/documents/:documentId/url", authenticate, async (c) => {
+  const { userId } = c.get("user");
+
+  const docUrl = await getCampaignDocumentUrl(
+    c.req.param("documentId"),
+    userId
+  );
+
+  return successResponse(c, { url: docUrl }, "OK");
+});
 
 // -------------------------------------------------------
 // POST /api/campaigns/:id/documents

@@ -1,5 +1,10 @@
 import prisma from "../lib/prisma";
-import { uploadFile, deleteFile, BUCKETS } from "./storage.service";
+import {
+  uploadFile,
+  deleteFile,
+  BUCKETS,
+  getSignedUrl,
+} from "./storage.service";
 import { AppError } from "../utils/error";
 
 type CreateCampaignInput = {
@@ -38,7 +43,6 @@ const campaignPublicSelect = {
   deadline: true,
   location: true,
   createdAt: true,
-  user: { select: { id: true, name: true, avatar: true } },
 };
 
 export async function createCampaign(
@@ -69,7 +73,10 @@ export async function createCampaign(
 
   return prisma.campaign.create({
     data: { ...data, userId, imageUrl },
-    select: { ...campaignPublicSelect, availableBalance: true },
+    select: {
+      ...campaignPublicSelect,
+      user: { select: { name: true } },
+    },
   });
 }
 
@@ -98,6 +105,7 @@ export async function getCampaigns(
       select: {
         ...campaignPublicSelect,
         ...(userId && { availableBalance: true }),
+        user: { select: { name: true } },
       },
       orderBy: { createdAt: "desc" },
       skip,
@@ -115,7 +123,7 @@ export async function getCampaignById(id: string) {
     select: {
       ...campaignPublicSelect,
       rejectReason: true,
-      documents: { select: { id: true, documentType: true, createdAt: true } },
+      user: { select: { id: true, name: true, avatar: true } },
       updates: {
         select: { id: true, content: true, createdAt: true },
         orderBy: { createdAt: "desc" },
@@ -177,7 +185,7 @@ export async function updateCampaign(
   return prisma.campaign.update({
     where: { id: campaignId },
     data: { ...data, imageUrl },
-    select: { ...campaignPublicSelect, availableBalance: true },
+    select: { ...campaignPublicSelect, user: { select: { name: true } } },
   });
 }
 
@@ -200,7 +208,7 @@ export async function submitCampaign(campaignId: string, userId: string) {
   return prisma.campaign.update({
     where: { id: campaignId },
     data: { status: "PENDING_REVIEW" },
-    select: campaignPublicSelect,
+    select: { ...campaignPublicSelect, user: { select: { name: true } } },
   });
 }
 
@@ -285,6 +293,7 @@ export async function addCampaignDocument(
 export async function getCampaignDocuments(campaignId: string, userId: string) {
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
+    select: { userId: true },
   });
   if (!campaign) throw new AppError(404, "Campaign tidak ditemukan");
 
@@ -293,9 +302,56 @@ export async function getCampaignDocuments(campaignId: string, userId: string) {
 
   return prisma.campaignDocument.findMany({
     where: { campaignId },
-    select: { id: true, documentType: true, createdAt: true },
+    select: { id: true, documentType: true, fileUrl: true, createdAt: true },
     orderBy: { createdAt: "asc" },
   });
+}
+
+export async function getCampaignDocumentUrl(
+  documentId: string,
+  userId: string
+) {
+  const document = await prisma.campaignDocument.findUnique({
+    where: { id: documentId },
+    select: { fileUrl: true, campaign: { select: { userId: true } } },
+  });
+
+  console.log(document);
+
+  if (!document) throw new AppError(404, "Dokumen tidak ditemukan");
+
+  if (document.campaign.userId !== userId)
+    throw new AppError(403, "Anda tidak memiliki akses ke dokumen ini");
+
+  if (!document.fileUrl) throw new AppError(404, "File belum tersedia");
+
+  return getSignedUrl(BUCKETS.CAMPAIGN_DOCS, document.fileUrl, 60 * 60);
+}
+
+export async function getCampaignDocumentsAsAdmin(campaignId: string) {
+  const campaign = await prisma.campaign.findUnique({
+    where: { id: campaignId },
+    select: { id: true },
+  });
+  if (!campaign) throw new AppError(404, "Campaign tidak ditemukan");
+
+  return prisma.campaignDocument.findMany({
+    where: { campaignId },
+    select: { id: true, documentType: true, fileUrl: true, createdAt: true },
+    orderBy: { createdAt: "asc" },
+  });
+}
+
+export async function getCampaignDocumentUrlAsAdmin(documentId: string) {
+  const document = await prisma.campaignDocument.findUnique({
+    where: { id: documentId },
+    select: { fileUrl: true },
+  });
+
+  if (!document) throw new AppError(404, "Dokumen tidak ditemukan");
+  if (!document.fileUrl) throw new AppError(404, "File belum tersedia");
+
+  return getSignedUrl(BUCKETS.CAMPAIGN_DOCS, document.fileUrl, 60 * 60);
 }
 
 export async function updateCampaignDocument(
@@ -501,7 +557,14 @@ export async function getSavedCampaigns(
   const [data, total] = await prisma.$transaction([
     prisma.savedCampaign.findMany({
       where: { userId },
-      select: { campaign: { select: campaignPublicSelect } },
+      select: {
+        campaign: {
+          select: {
+            ...campaignPublicSelect,
+            user: { select: { name: true } },
+          },
+        },
+      },
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
@@ -557,7 +620,10 @@ export async function approveCampaign(campaignId: string) {
   return prisma.campaign.update({
     where: { id: campaignId },
     data: { status: "ACTIVE" },
-    select: campaignPublicSelect,
+    select: {
+      ...campaignPublicSelect,
+      user: { select: { name: true, verificationStatus: true } },
+    },
   });
 }
 
@@ -578,7 +644,10 @@ export async function rejectCampaign(campaignId: string, rejectReason: string) {
   return prisma.campaign.update({
     where: { id: campaignId },
     data: { status: "REJECTED", rejectReason },
-    select: campaignPublicSelect,
+    select: {
+      ...campaignPublicSelect,
+      user: { select: { name: true, verificationStatus: true } },
+    },
   });
 }
 
@@ -592,7 +661,10 @@ export async function closeCampaign(campaignId: string) {
   return prisma.campaign.update({
     where: { id: campaignId },
     data: { status: "CLOSED" },
-    select: campaignPublicSelect,
+    select: {
+      ...campaignPublicSelect,
+      user: { select: { name: true, verificationStatus: true } },
+    },
   });
 }
 

@@ -13,7 +13,7 @@ User bisa bikin campaign penggalangan dana, dan user lain bisa donasi via paymen
 ### Core Flow
 1. **User** register → verifikasi identitas (upload KTP) → bisa bikin campaign
 2. **Campaign** dibuat (DRAFT) → submit → admin review → APPROVED/REJECTED → ACTIVE
-3. **Donatur** donasi → bayar via Midtrans → status SUCCESS → `collectedAmount` update
+3. **Donatur** donasi → bayar via Midtrans → status SUCCESS → `collectedAmount` dan `availableBalance` update
 4. **Campaign owner** request withdrawal → admin approve → admin transfer manual → mark PAID
 5. **Admin** punya dashboard buat verifikasi user, approve campaign, approve withdrawal
 
@@ -114,6 +114,11 @@ src/
 - **Validators JANGAN akses DB.** Cuma shape validation. Existence check di service.
 - **Services boleh saling call** tapi hindari circular dependency. Kalo ribet, ekstrak ke helper.
 - Satu file = satu tanggung jawab. Jangan numpuk semua di `index.ts`.
+- **Efisiensi DB call**: Hindari N+1 (batch dengan `in`), select hanya field yang perlu,
+  include relasi sekalian daripada query terpisah, dan gunakan transaksi untuk operasi atomik.
+- **Fungsi service**: Konsolidasi variasi serupa dengan parameter opsional.
+  Patokan: getX, listX, createX, updateX, deleteX. Tambah hanya kalau betul-betul beda logic,
+  bukan sekadar beda filter.
 
 ---
 
@@ -151,7 +156,7 @@ Schema sekarang masih bisa dibagusin. Saat ngerjain task terkait, sekalian propo
    - `Withdrawal`: `@@index([campaignId])`, `@@index([status])`
 3. **Guest donation:** `Donation.userId` jadi optional, atau bikin pattern "guest user" (decide saat implementasi donation).
 4. **Soft delete** (opsional): tambah `deletedAt` di `Campaign` & `User` kalo perlu.
-5. **`Campaign.collectedAmount` consistency:** WAJIB update di dalam transaction saat Donation berubah ke SUCCESS. Jangan trust nilai cached blindly — sediakan service `recalculateCollectedAmount(campaignId)` buat recovery.
+5. **`Campaign.collectedAmount and availableBalance` consistency:** WAJIB update di dalam transaction saat Donation berubah ke SUCCESS. Jangan trust nilai cached blindly — sediakan service `recalculateCollectedAmount(campaignId)` buat recovery.
 
 **Aturan:** Setiap kali mau ubah schema → konfirmasi dulu → kalo OK, edit `schema.prisma` → suruh user run `npx prisma migrate dev --name <nama>` sendiri.
 
@@ -296,19 +301,39 @@ if (campaign.status !== 'ACTIVE') throw new AppError(422, 'Campaign tidak aktif'
    - Generate Midtrans Snap token → simpan ke `paymentToken`
    - Return token ke frontend
 3. Frontend buka Snap popup → user bayar
-4. Midtrans webhook hit `/webhooks/midtrans`:
-   - Verify signature pake `MIDTRANS_SERVER_KEY`
+4. Midtrans webhook hit `/api/webhooks/midtrans`:
+   - Verify signature: `SHA512(order_id + status_code + gross_amount + MIDTRANS_SERVER_KEY)`
    - Kalo `settlement` / `capture`: update Donation jadi SUCCESS, **dalam transaction** increment `Campaign.collectedAmount`
-   - Kalo `expire` / `cancel` / `deny`: update jadi FAILED/EXPIRED
+   - Kalo `expire`: update jadi EXPIRED. Kalo `cancel` / `deny` / `failure`: jadi FAILED
 
 **Idempotency:** Webhook bisa kena dua kali. Cek dulu kalo Donation udah SUCCESS, skip.
 
+### Donation Endpoints
+| Method | Path | Auth | Keterangan |
+|---|---|---|---|
+| `POST` | `/api/donations` | `donation:create` | Buat donasi + Snap token |
+| `GET` | `/api/donations` | `donation:view:own` | Riwayat donasi user sendiri |
+| `GET` | `/api/donations/:id` | authenticate | Detail donasi (owner only) |
+| `GET` | `/api/campaigns/:id/donations` | publik | Donasi SUCCESS per campaign |
+| `POST` | `/api/webhooks/midtrans` | — (signature) | Midtrans notification handler |
+
+**`GET /api/campaigns/:id/donations`** — query params: `page`, `limit` (max 50, default 10), `sort` (`newest`/`oldest`/`largest`/`smallest`).
+- Hanya return donasi berstatus `SUCCESS`
+- Kalau `isAnonymous: true` → `user: null` (sembunyikan identitas donatur)
+- Tidak expose `paymentToken`, `midtransOrderId`, `platformFee`
+
 ### Withdrawal Flow
-1. Owner request → POST `/withdrawals` dengan nominal & data bank
-2. Validate: `amount <= (collectedAmount - sum withdrawal yg udah APPROVED/PAID)`
-3. Status PENDING → admin review
-4. Admin APPROVE → admin transfer manual ke bank → upload `proofUrl` → mark PAID
-5. Hitung `adminFee` di service (constant atau persen)
+1. Owner request → POST `/withdrawals` dengan `amount` & data bank
+2. Validate: `amount <= availableBalance` (atomic, dalam transaksi)
+3. Buat withdrawal status PENDING → gunakan `availableBalance` untuk menghitung jumlah dana yang bisa ditarik 
+4. Admin review:
+   - **APPROVE** → withdrawal disetujui dan akan diproses untuk mark paid
+   - **REJECT** → withdrawal gagal dan gabisa diajukan ulang
+5. `collectedAmount` tidak pernah berubah — hanya bertambah saat donasi masuk
+6. Hitung `adminFee` di service saat create withdrawal (konstanta atau persen dari `amount`)
+7. Admin pay:
+   - Admin Transfer Manual
+   - Kirim proof → jika berhasil `availableBalance` dikurangi jumlah penarikan
 
 ### Campaign Status Transition
 ```
@@ -373,15 +398,7 @@ NODE_ENV=development
 
 ---
 
-## 14. Git & Commit Convention
-
-- Conventional commits: `feat:`, `fix:`, `refactor:`, `chore:`, `docs:`
-- Contoh: `feat(campaign): add approval endpoint`, `fix(donation): handle webhook idempotency`
-- Branch naming: `feature/campaign-approval`, `fix/donation-webhook`
-
----
-
-## 15. Things to AVOID
+## 14. Things to AVOID
 
 ❌ `new PrismaClient()` di luar `src/lib/prisma.ts`
 ❌ Business logic di route handler
@@ -398,7 +415,7 @@ NODE_ENV=development
 
 ---
 
-## 16. Common Commands
+## 15. Common Commands
 
 ```bash
 # Dev
@@ -416,7 +433,7 @@ npm run typecheck
 
 ---
 
-## 17. Saat Mulai Task Baru — Checklist Claude Code
+## 16. Saat Mulai Task Baru — Checklist Claude Code
 
 Sebelum nulis kode:
 1. Baca file ini ✅

@@ -26,7 +26,7 @@ adminCampaignRoute.get("/", async (c) => {
   const page = query.success ? query.data.page : 1;
   const limit = query.success ? query.data.limit : 12;
   const status = query.success ? query.data.status : undefined;
-  const result = await getCampaigns({ page, limit, status }, undefined);
+  const result = await getCampaigns({ page, limit, status }, undefined, true);
 
   return successResponse(c, result, "OK");
 });

@@ -82,8 +82,10 @@ export async function createCampaign(
 
 export async function getCampaigns(
   filter: GetCampaignsFilter = {},
-  userId?: string
+  userId?: string,
+  withPendingTotal?: boolean
 ) {
+  console.log(filter, userId, withPendingTotal);
   const { category, status = "ACTIVE", search, page = 1, limit = 12 } = filter;
   const skip = (page - 1) * limit;
 
@@ -99,7 +101,7 @@ export async function getCampaigns(
     }),
   };
 
-  const [data, total] = await prisma.$transaction([
+  const [data, total, totalPending] = await prisma.$transaction([
     prisma.campaign.findMany({
       where,
       select: {
@@ -112,9 +114,20 @@ export async function getCampaigns(
       take: limit,
     }),
     prisma.campaign.count({ where }),
+    prisma.campaign.count({
+      where: {
+        status: "PENDING_REVIEW",
+      },
+    }),
   ]);
 
-  return { data, total, page, limit };
+  return {
+    data,
+    total,
+    page,
+    limit,
+    ...(withPendingTotal && { totalPending }),
+  };
 }
 
 export async function getCampaignById(id: string) {

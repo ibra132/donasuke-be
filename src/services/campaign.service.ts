@@ -69,7 +69,7 @@ export async function createCampaign(
 
   return prisma.campaign.create({
     data: { ...data, userId, imageUrl },
-    select: campaignPublicSelect,
+    select: { ...campaignPublicSelect, availableBalance: true },
   });
 }
 
@@ -95,7 +95,10 @@ export async function getCampaigns(
   const [data, total] = await prisma.$transaction([
     prisma.campaign.findMany({
       where,
-      select: campaignPublicSelect,
+      select: {
+        ...campaignPublicSelect,
+        ...(userId && { availableBalance: true }),
+      },
       orderBy: { createdAt: "desc" },
       skip,
       take: limit,
@@ -174,7 +177,7 @@ export async function updateCampaign(
   return prisma.campaign.update({
     where: { id: campaignId },
     data: { ...data, imageUrl },
-    select: campaignPublicSelect,
+    select: { ...campaignPublicSelect, availableBalance: true },
   });
 }
 

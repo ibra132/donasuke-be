@@ -249,10 +249,17 @@ export async function markWithdrawalPaid(
     proofFile.type
   );
 
-  const withdrawal = await prisma.withdrawal.update({
-    where: { id: withdrawalId },
-    data: { status: "PAID", proofUrl: path },
-    select: withdrawalAdminSelect,
+  const withdrawal = await prisma.$transaction(async (tx) => {
+    await tx.campaign.update({
+      where: { id: existing.campaignId },
+      data: { availableBalance: { decrement: existing.amount } },
+    });
+
+    return tx.withdrawal.update({
+      where: { id: withdrawalId },
+      data: { status: "PAID", proofUrl: path },
+      select: withdrawalAdminSelect,
+    });
   });
 
   const proofSignedUrl = await getSignedUrl(

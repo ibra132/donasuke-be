@@ -141,7 +141,10 @@ export async function handleMidtransWebhook(payload: MidtransNotification) {
       });
       await tx.campaign.update({
         where: { id: donation.campaignId },
-        data: { collectedAmount: { increment: donation.amount } },
+        data: {
+          collectedAmount: { increment: donation.amount },
+          availableBalance: { increment: donation.amount },
+        },
       });
     });
   } else if (transaction_status === "expire") {

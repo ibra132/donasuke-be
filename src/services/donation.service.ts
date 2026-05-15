@@ -18,6 +18,7 @@ type MidtransNotification = {
   signature_key: string;
   transaction_status: string;
   payment_type: string;
+  fraud_status?: string;
 };
 
 const donationSelect = {
@@ -75,7 +76,7 @@ export async function createDonation(
     const result = await snap.createTransaction({
       transaction_details: {
         order_id: orderId,
-        gross_amount: data.amount,
+        gross_amount: data.amount + platformFee,
       },
       item_details: [
         {
@@ -108,6 +109,7 @@ export async function handleMidtransWebhook(payload: MidtransNotification) {
     signature_key,
     transaction_status,
     payment_type,
+    fraud_status,
   } = payload;
 
   const serverKey = process.env.MIDTRANS_SERVER_KEY ?? "";
@@ -116,20 +118,29 @@ export async function handleMidtransWebhook(payload: MidtransNotification) {
     .update(`${order_id}${status_code}${gross_amount}${serverKey}`)
     .digest("hex");
 
-  if (expected !== signature_key)
+  if (expected !== signature_key) {
     throw new AppError(400, "Signature tidak valid");
+  }
 
   const donation = await prisma.donation.findUnique({
     where: { midtransOrderId: order_id },
+    select: { id: true, status: true, campaignId: true, amount: true },
   });
 
   if (!donation) return;
 
-  // Idempotency check
   const FINAL_STATUSES = ["SUCCESS", "EXPIRED", "FAILED"];
   if (FINAL_STATUSES.includes(donation.status)) return;
 
-  if (transaction_status === "settlement" || transaction_status === "capture") {
+  const isSuccess =
+    transaction_status === "settlement" ||
+    (transaction_status === "capture" && fraud_status === "accept");
+
+  const isExpired = transaction_status === "expire";
+
+  const isFailed = ["cancel", "deny", "failure"].includes(transaction_status);
+
+  if (isSuccess) {
     await prisma.$transaction(async (tx) => {
       await tx.donation.update({
         where: { id: donation.id },
@@ -139,6 +150,7 @@ export async function handleMidtransWebhook(payload: MidtransNotification) {
           paymentMethod: payment_type,
         },
       });
+
       await tx.campaign.update({
         where: { id: donation.campaignId },
         data: {
@@ -147,12 +159,12 @@ export async function handleMidtransWebhook(payload: MidtransNotification) {
         },
       });
     });
-  } else if (transaction_status === "expire") {
+  } else if (isExpired) {
     await prisma.donation.update({
       where: { id: donation.id },
       data: { status: "EXPIRED" },
     });
-  } else if (["cancel", "deny", "failure"].includes(transaction_status)) {
+  } else if (isFailed) {
     await prisma.donation.update({
       where: { id: donation.id },
       data: { status: "FAILED" },

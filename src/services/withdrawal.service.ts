@@ -32,66 +32,61 @@ export async function createWithdrawal(
   userId: string,
   data: CreateWithdrawalInput
 ) {
-  const campaign = await prisma.campaign.findFirst({
-    where: {
-      id: data.campaignId,
-      userId,
-      user: {
-        verificationStatus: "APPROVED",
+  return prisma.$transaction(async (tx) => {
+    const campaign = await tx.campaign.findFirst({
+      where: {
+        id: data.campaignId,
+        userId,
+        user: { verificationStatus: "APPROVED" },
       },
-    },
-    select: {
-      status: true,
-      collectedAmount: true,
-      userId: true,
-      user: { select: { verificationStatus: true } },
-    },
-  });
+      select: {
+        status: true,
+        availableBalance: true,
+      },
+    });
 
-  if (!campaign) {
-    throw new AppError(403, "Campaign tidak ditemukan atau akses ditolak");
-  }
+    if (!campaign) {
+      throw new AppError(403, "Campaign tidak ditemukan atau akses ditolak");
+    }
 
-  if (!WITHDRAWABLE_STATUSES.includes(campaign.status as any)) {
-    throw new AppError(
-      422,
-      "Campaign harus berstatus ACTIVE, CLOSED, atau EXPIRED untuk melakukan penarikan"
-    );
-  }
+    if (!WITHDRAWABLE_STATUSES.includes(campaign.status as any)) {
+      throw new AppError(
+        422,
+        "Campaign harus berstatus ACTIVE, CLOSED, atau EXPIRED untuk melakukan penarikan"
+      );
+    }
 
-  const usedAgg = await prisma.withdrawal.aggregate({
-    where: {
-      campaignId: data.campaignId,
-      status: { in: ["PENDING", "APPROVED", "PAID"] },
-    },
-    _sum: { amount: true },
-  });
+    if (data.amount > campaign.availableBalance) {
+      throw new AppError(
+        422,
+        `Saldo tidak cukup. Tersedia: Rp ${campaign.availableBalance.toLocaleString(
+          "id-ID"
+        )}`
+      );
+    }
 
-  const available = campaign.collectedAmount - (usedAgg._sum.amount ?? 0);
+    await tx.campaign.update({
+      where: { id: data.campaignId },
+      data: { availableBalance: { decrement: data.amount } },
+    });
 
-  if (data.amount > available) {
-    throw new AppError(
-      422,
-      `Saldo tidak cukup. Tersedia: Rp ${available.toLocaleString("id-ID")}`
-    );
-  }
-
-  return prisma.withdrawal.create({
-    data: {
-      userId,
-      campaignId: data.campaignId,
-      amount: data.amount,
-      adminFee: WITHDRAWAL_ADMIN_FEE,
-      bankName: data.bankName,
-      bankAccount: data.bankAccount,
-      accountHolder: data.accountHolder,
-      note: data.note,
-      status: "PENDING",
-    },
-    select: {
-      ...withdrawalBaseSelect,
-      campaign: { select: { id: true, title: true } },
-    },
+    return tx.withdrawal.create({
+      data: {
+        userId,
+        campaignId: data.campaignId,
+        amount: data.amount,
+        adminFee: WITHDRAWAL_ADMIN_FEE,
+        bankName: data.bankName,
+        bankAccount: data.bankAccount,
+        accountHolder: data.accountHolder,
+        note: data.note,
+        status: "PENDING",
+      },
+      select: {
+        ...withdrawalBaseSelect,
+        campaign: { select: { id: true, title: true } },
+      },
+    });
   });
 }
 

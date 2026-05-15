@@ -1,5 +1,10 @@
 import prisma from "../lib/prisma";
-import { uploadFile, deleteFile, getSignedUrl, BUCKETS } from "./storage.service";
+import {
+  uploadFile,
+  deleteFile,
+  getSignedUrl,
+  BUCKETS,
+} from "./storage.service";
 import { AppError } from "../utils/error";
 import {
   ALLOWED_AVATAR_TYPES,
@@ -154,9 +159,7 @@ export async function submitVerification(
   return { nik, verificationStatus: "PENDING" as const };
 }
 
-// ── Admin ─────────────────────────────────────────────────────
-
-const KTP_SIGNED_URL_EXPIRY = 3600; // 1 jam
+const KTP_SIGNED_URL_EXPIRY = 3600;
 
 export async function getVerifications(
   status: "PENDING" | "APPROVED" | "REJECTED" = "PENDING",

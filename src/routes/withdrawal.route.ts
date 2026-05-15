@@ -9,6 +9,7 @@ import {
   createWithdrawal,
   getMyWithdrawals,
   getWithdrawalById,
+  getWithdrawalProof,
 } from "../services/withdrawal.service";
 import { successResponse, errorResponse } from "../utils/response";
 
@@ -50,12 +51,33 @@ withdrawalRoute.get(
 // -------------------------------------------------------
 // GET /api/withdrawals/:id
 // -------------------------------------------------------
-withdrawalRoute.get("/:id", authenticate, async (c) => {
-  const { userId } = c.get("user");
-  const withdrawal = await getWithdrawalById(c.req.param("id"), userId);
+withdrawalRoute.get(
+  "/:id",
+  authenticate,
+  requirePermission("withdrawal:view:own"),
+  async (c) => {
+    const { userId } = c.get("user");
+    const withdrawal = await getWithdrawalById(c.req.param("id"), userId);
 
-  return successResponse(c, { withdrawal }, "OK");
-});
+    return successResponse(c, { withdrawal }, "OK");
+  }
+);
+
+// -------------------------------------------------------
+// GET /api/withdrawals/:id/proof
+// -------------------------------------------------------
+withdrawalRoute.get(
+  "/:id/proof",
+  authenticate,
+  requirePermission("withdrawal:view:own"),
+  async (c) => {
+    const { userId } = c.get("user");
+
+    const proofUrl = await getWithdrawalProof(userId, c.req.param("id"));
+
+    return successResponse(c, { proofUrl }, "OK");
+  }
+);
 
 // -------------------------------------------------------
 // POST /api/withdrawals

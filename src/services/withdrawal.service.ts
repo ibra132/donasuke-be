@@ -262,11 +262,21 @@ export async function markWithdrawalPaid(
     });
   });
 
-  const proofSignedUrl = await getSignedUrl(
-    BUCKETS.WITHDRAWAL_PROOF,
-    path,
-    WITHDRAWAL_PROOF_SIGNED_URL_EXPIRY
-  );
+  return { ...withdrawal, proofUrl: path };
+}
 
-  return { ...withdrawal, proofUrl: proofSignedUrl };
+export async function getWithdrawalProof(userId: string, withdrawalId: string) {
+  const withdrawal = await prisma.withdrawal.findUnique({
+    where: { id: withdrawalId },
+    select: { proofUrl: true, status: true, userId: true },
+  });
+
+  if (!withdrawal) throw new AppError(404, "Penarikan tidak ditemukan");
+
+  if (!withdrawal.proofUrl) throw new AppError(404, "Bukti belum tersedia");
+
+  if (withdrawal.userId !== userId)
+    throw new AppError(403, "Bukan penarikan milik Anda");
+
+  return getSignedUrl(BUCKETS.WITHDRAWAL_PROOF, withdrawal.proofUrl, 60 * 60);
 }

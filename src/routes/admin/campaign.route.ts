@@ -5,7 +5,6 @@ import {
   getCampaignsQuerySchema,
 } from "../../validators/campaign.validator";
 import {
-  getPendingCampaigns,
   getCampaignById,
   approveCampaign,
   rejectCampaign,
@@ -13,6 +12,7 @@ import {
   recalculateCollectedAmount,
   getCampaignDocumentsAsAdmin,
   getCampaignDocumentUrlAsAdmin,
+  getCampaigns,
 } from "../../services/campaign.service";
 import { successResponse, errorResponse } from "../../utils/response";
 
@@ -25,7 +25,8 @@ adminCampaignRoute.get("/", async (c) => {
   const query = getCampaignsQuerySchema.safeParse(c.req.query());
   const page = query.success ? query.data.page : 1;
   const limit = query.success ? query.data.limit : 12;
-  const result = await getPendingCampaigns(page, limit);
+  const status = query.success ? query.data.status : undefined;
+  const result = await getCampaigns({ page, limit, status }, undefined);
 
   return successResponse(c, result, "OK");
 });

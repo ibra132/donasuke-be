@@ -575,34 +575,6 @@ export async function getSavedCampaigns(
   return { data: data.map((d) => d.campaign), total, page, limit };
 }
 
-export async function getPendingCampaigns(page = 1, limit = 12) {
-  const skip = (page - 1) * limit;
-  const where = { status: "PENDING_REVIEW" as const };
-
-  const [data, total] = await prisma.$transaction([
-    prisma.campaign.findMany({
-      where,
-      select: {
-        ...campaignPublicSelect,
-        user: {
-          select: {
-            id: true,
-            name: true,
-            avatar: true,
-            verificationStatus: true,
-          },
-        },
-      },
-      orderBy: { createdAt: "asc" },
-      skip,
-      take: limit,
-    }),
-    prisma.campaign.count({ where }),
-  ]);
-
-  return { data, total, page, limit };
-}
-
 export async function approveCampaign(campaignId: string) {
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },

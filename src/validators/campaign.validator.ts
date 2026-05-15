@@ -10,6 +10,16 @@ const CAMPAIGN_CATEGORIES = [
   "LAINNYA",
 ] as const;
 
+const CAMPAIGN_STATUSES = [
+  "DRAFT",
+  "PENDING_REVIEW",
+  "APPROVED",
+  "ACTIVE",
+  "REJECTED",
+  "CLOSED",
+  "EXPIRED",
+] as const;
+
 const MIN_DEADLINE_DAYS = 7;
 
 export const createCampaignSchema = z
@@ -80,16 +90,7 @@ export const createReportSchema = z.object({
 
 export const getCampaignsQuerySchema = z.object({
   category: z.enum(CAMPAIGN_CATEGORIES).optional(),
-  status: z
-    .enum([
-      "DRAFT",
-      "PENDING_REVIEW",
-      "ACTIVE",
-      "CLOSED",
-      "EXPIRED",
-      "REJECTED",
-    ])
-    .optional(),
+  status: z.enum(CAMPAIGN_STATUSES, { error: "Status tidak valid" }).optional(),
   search: z.string().optional(),
   page: z.coerce.number().int().positive().default(1),
   limit: z.coerce.number().int().positive().max(50).default(12),

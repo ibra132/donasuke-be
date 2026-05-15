@@ -8,8 +8,6 @@ export const authRoute = new Hono();
 
 authRoute.get("/", (c) => c.json({ message: "auth route" }));
 
-// ── Public
-
 // -------------------------------------------------------
 // POST /api/auth/register
 // -------------------------------------------------------

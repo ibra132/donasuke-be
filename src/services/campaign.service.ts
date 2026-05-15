@@ -683,20 +683,25 @@ export async function recalculateCollectedAmount(campaignId: string) {
 
   if (!campaign) throw new AppError(404, "Campaign tidak ditemukan");
 
-  const result = await prisma.$transaction(async (tx) => {
-    const agg = await tx.donation.aggregate({
-      where: { campaignId, status: "SUCCESS" },
-      _sum: { amount: true },
-    });
+  return prisma.$transaction(async (tx) => {
+    const [donationAgg, withdrawalAgg] = await Promise.all([
+      tx.donation.aggregate({
+        where: { campaignId, status: "SUCCESS" },
+        _sum: { amount: true },
+      }),
+      tx.withdrawal.aggregate({
+        where: { campaignId, status: "PAID" },
+        _sum: { amount: true },
+      }),
+    ]);
 
-    const total = agg._sum.amount ?? 0;
+    const collectedAmount = donationAgg._sum.amount ?? 0;
+    const availableBalance = collectedAmount - (withdrawalAgg._sum.amount ?? 0);
 
     return tx.campaign.update({
       where: { id: campaignId },
-      data: { collectedAmount: total },
-      select: { id: true, collectedAmount: true },
+      data: { collectedAmount, availableBalance },
+      select: { id: true, collectedAmount: true, availableBalance: true },
     });
   });
-
-  return result;
 }

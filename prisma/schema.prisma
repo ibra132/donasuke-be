@@ -104,6 +104,7 @@ model User {
   avatar                   String?
   bio                      String?
   createdAt                DateTime            @default(now())
+  updatedAt                DateTime            @updatedAt
 
   roles          UserRole[]
   campaigns      Campaign[]
@@ -128,6 +129,7 @@ model Campaign {
   location        String?
   rejectReason    String?
   createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   user        User               @relation(fields: [userId], references: [id])
   documents   CampaignDocument[]
@@ -136,6 +138,10 @@ model Campaign {
   savedBy     SavedCampaign[]
   reports     Report[]
   withdrawals Withdrawal[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([category])
 }
 
 model CampaignDocument {
@@ -162,9 +168,13 @@ model Donation {
   midtransOrderId String?        @unique
   paidAt          DateTime?
   createdAt       DateTime       @default(now())
+  updatedAt       DateTime       @updatedAt
 
   user     User     @relation(fields: [userId], references: [id])
   campaign Campaign @relation(fields: [campaignId], references: [id])
+
+  @@index([userId])
+  @@index([campaignId, status])
 }
 
 model Withdrawal {
@@ -180,9 +190,13 @@ model Withdrawal {
   note          String?
   proofUrl      String?
   createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
 
   campaign Campaign @relation(fields: [campaignId], references: [id])
   user     User     @relation(fields: [userId], references: [id])
+
+  @@index([campaignId])
+  @@index([status])
 }
 
 model CampaignUpdate {
@@ -190,6 +204,7 @@ model CampaignUpdate {
   campaignId String
   content    String
   createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
   campaign Campaign @relation(fields: [campaignId], references: [id])
 }

@@ -1,6 +1,7 @@
 import { Hono } from "hono";
 import { authenticate } from "../middleware/auth.middleware";
 import { requirePermission } from "../middleware/rbac.middleware";
+import { donationRateLimiter } from "../middleware/ratelimit.middleware";
 import {
   createDonationSchema,
   getDonationsQuerySchema,
@@ -63,6 +64,7 @@ donationRoute.get("/:id", authenticate, async (c) => {
 donationRoute.post(
   "/",
   authenticate,
+  donationRateLimiter,
   requirePermission("donation:create"),
   async (c) => {
     const { userId } = c.get("user");

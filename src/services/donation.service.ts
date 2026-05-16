@@ -3,6 +3,7 @@ import prisma from "../lib/prisma";
 import snap from "../lib/midtrans";
 import { AppError } from "../utils/error";
 import { PLATFORM_FEE_PERCENT } from "../utils/constants";
+import { env } from "../lib/env";
 
 type CreateDonationInput = {
   campaignId: string;
@@ -112,7 +113,7 @@ export async function handleMidtransWebhook(payload: MidtransNotification) {
     fraud_status,
   } = payload;
 
-  const serverKey = process.env.MIDTRANS_SERVER_KEY ?? "";
+  const serverKey = env.MIDTRANS_SERVER_KEY;
   const expected = crypto
     .createHash("sha512")
     .update(`${order_id}${status_code}${gross_amount}${serverKey}`)

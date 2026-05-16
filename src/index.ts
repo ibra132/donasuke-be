@@ -1,4 +1,5 @@
 import 'dotenv/config'
+import './lib/env' // validate env vars at startup, exits if invalid
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { ZodError } from 'zod'

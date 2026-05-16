@@ -3,6 +3,10 @@ import { authenticate } from "../middleware/auth.middleware";
 import { registerSchema, loginSchema } from "../validators/auth.validator";
 import { register, login, getMe } from "../services/auth.service";
 import { successResponse, errorResponse } from "../utils/response";
+import {
+  loginRateLimiter,
+  registerRateLimiter,
+} from "../middleware/ratelimit.middleware";
 
 export const authRoute = new Hono();
 
@@ -11,7 +15,7 @@ authRoute.get("/", (c) => c.json({ message: "auth route" }));
 // -------------------------------------------------------
 // POST /api/auth/register
 // -------------------------------------------------------
-authRoute.post("/register", async (c) => {
+authRoute.post("/register", registerRateLimiter, async (c) => {
   const body = await c.req.json();
   const result = registerSchema.safeParse(body);
 
@@ -35,7 +39,7 @@ authRoute.post("/register", async (c) => {
 // -------------------------------------------------------
 // POST /api/auth/login
 // -------------------------------------------------------
-authRoute.post("/login", async (c) => {
+authRoute.post("/login", loginRateLimiter, async (c) => {
   const body = await c.req.json();
   const result = loginSchema.safeParse(body);
 

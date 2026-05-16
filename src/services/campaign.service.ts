@@ -85,7 +85,6 @@ export async function getCampaigns(
   userId?: string,
   withPendingTotal?: boolean
 ) {
-  console.log(filter, userId, withPendingTotal);
   const { category, status = "ACTIVE", search, page = 1, limit = 12 } = filter;
   const skip = (page - 1) * limit;
 
@@ -328,8 +327,6 @@ export async function getCampaignDocumentUrl(
     where: { id: documentId },
     select: { fileUrl: true, campaign: { select: { userId: true } } },
   });
-
-  console.log(document);
 
   if (!document) throw new AppError(404, "Dokumen tidak ditemukan");
 

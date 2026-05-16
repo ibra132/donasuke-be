@@ -206,7 +206,6 @@ export async function markWithdrawalPaid(
   withdrawalId: string,
   proofFile: File
 ) {
-  const WITHDRAWAL_PROOF_SIGNED_URL_EXPIRY = 60 * 60 * 24;
   const ALLOWED = ["image/jpeg", "image/png", "application/pdf"];
   const MAX_SIZE = 10 * 1024 * 1024;
 

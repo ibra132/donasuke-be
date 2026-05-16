@@ -1,11 +1,8 @@
 import prisma from "../lib/prisma";
-import {
-  uploadFile,
-  deleteFile,
-  BUCKETS,
-  getSignedUrl,
-} from "./storage.service";
+import { uploadFile, deleteFile, getSignedUrl } from "./storage.service";
 import { AppError } from "../utils/error";
+import { ALLOWED_DOC_TYPES, BUCKETS, MAX_DOC_SIZE } from "../utils/constants";
+import { validateFile } from "../utils/file";
 
 type CreateCampaignInput = {
   title: string;
@@ -53,13 +50,12 @@ export async function createCampaign(
   let imageUrl: string | undefined;
 
   if (imageFile) {
-    const allowed = ["image/jpeg", "image/png", "image/webp"];
-
-    if (!allowed.includes(imageFile.type))
-      throw new AppError(400, "Format gambar tidak valid");
-
-    if (imageFile.size > 5 * 1024 * 1024)
-      throw new AppError(400, "Ukuran gambar maksimal 5MB");
+    validateFile(
+      imageFile,
+      ["image/jpeg", "image/png", "image/webp"],
+      5 * 1024 * 1024,
+      "Gambar"
+    );
 
     const ext = imageFile.type.split("/")[1];
     const path = `${userId}/${Date.now()}.${ext}`;
@@ -170,13 +166,12 @@ export async function updateCampaign(
   let imageUrl = campaign.imageUrl ?? undefined;
 
   if (imageFile) {
-    const allowed = ["image/jpeg", "image/png", "image/webp"];
-
-    if (!allowed.includes(imageFile.type))
-      throw new AppError(400, "Format gambar tidak valid");
-
-    if (imageFile.size > 5 * 1024 * 1024)
-      throw new AppError(400, "Ukuran gambar maksimal 5MB");
+    validateFile(
+      imageFile,
+      ["image/jpeg", "image/png", "image/webp"],
+      5 * 1024 * 1024,
+      "Gambar"
+    );
 
     if (campaign.imageUrl) {
       const oldPath = campaign.imageUrl.split(`/campaign-images/`)[1];
@@ -252,24 +247,7 @@ export async function addCampaignDocument(
   docFile: File,
   documentType: string
 ) {
-  const ALLOWED_DOC_TYPES = [
-    "image/jpeg",
-    "image/png",
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  ];
-  const MAX_DOC_SIZE = 10 * 1024 * 1024; // 10MB
-
-  if (!ALLOWED_DOC_TYPES.includes(docFile.type)) {
-    throw new AppError(
-      400,
-      "Format dokumen tidak valid. Gunakan PDF, DOC, DOCX, JPG, atau PNG"
-    );
-  }
-  if (docFile.size > MAX_DOC_SIZE) {
-    throw new AppError(400, "Ukuran dokumen maksimal 10MB");
-  }
+  validateFile(docFile, ALLOWED_DOC_TYPES, MAX_DOC_SIZE, "Dokumen");
 
   const campaign = await prisma.campaign.findUnique({
     where: { id: campaignId },
@@ -370,24 +348,7 @@ export async function updateCampaignDocument(
   newFile: File,
   documentType?: string
 ) {
-  const ALLOWED_DOC_TYPES = [
-    "image/jpeg",
-    "image/png",
-    "application/pdf",
-    "application/msword",
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-  ];
-  const MAX_DOC_SIZE = 10 * 1024 * 1024;
-
-  if (!ALLOWED_DOC_TYPES.includes(newFile.type)) {
-    throw new AppError(
-      400,
-      "Format dokumen tidak valid. Gunakan PDF, DOC, DOCX, JPG, atau PNG"
-    );
-  }
-
-  if (newFile.size > MAX_DOC_SIZE)
-    throw new AppError(400, "Ukuran dokumen maksimal 10MB");
+  validateFile(newFile, ALLOWED_DOC_TYPES, MAX_DOC_SIZE, "Dokumen");
 
   const doc = await prisma.campaignDocument.findUnique({
     where: { id: docId },

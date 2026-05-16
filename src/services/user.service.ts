@@ -1,20 +1,16 @@
 import prisma from "../lib/prisma";
-import {
-  uploadFile,
-  deleteFile,
-  getSignedUrl,
-  BUCKETS,
-} from "./storage.service";
+import { uploadFile, deleteFile, getSignedUrl } from "./storage.service";
 import { AppError } from "../utils/error";
+import { validateFile } from "../utils/file";
 import {
   ALLOWED_AVATAR_TYPES,
+  ALLOWED_KTP_TYPES,
+  BUCKETS,
   MAX_AVATAR_SIZE,
-} from "../validators/user.validator";
+  MAX_KTP_SIZE,
+} from "../utils/constants";
 
 type UpdateProfileInput = { name?: string; bio?: string };
-
-const ALLOWED_KTP_TYPES = ["image/jpeg", "image/png"] as const;
-const MAX_KTP_SIZE = 5 * 1024 * 1024; // 5MB
 
 function mimeToExt(mime: string): string {
   return mime === "image/png" ? "png" : "jpg";
@@ -67,17 +63,7 @@ export async function updateProfile(userId: string, data: UpdateProfileInput) {
 }
 
 export async function uploadAvatar(userId: string, file: File) {
-  if (
-    !ALLOWED_AVATAR_TYPES.includes(
-      file.type as (typeof ALLOWED_AVATAR_TYPES)[number]
-    )
-  ) {
-    throw new AppError(400, "Format file tidak valid. Gunakan JPEG atau PNG");
-  }
-
-  if (file.size > MAX_AVATAR_SIZE) {
-    throw new AppError(400, "Ukuran file maksimal 2MB");
-  }
+  validateFile(file, ALLOWED_AVATAR_TYPES, MAX_AVATAR_SIZE, "Avatar");
 
   const ext = mimeToExt(file.type);
   const path = `${userId}/${Date.now()}.${ext}`;
@@ -110,20 +96,7 @@ export async function submitVerification(
   nik: string,
   ktpFile: File
 ) {
-  if (
-    !ALLOWED_KTP_TYPES.includes(
-      ktpFile.type as (typeof ALLOWED_KTP_TYPES)[number]
-    )
-  ) {
-    throw new AppError(
-      400,
-      "Format file KTP tidak valid. Gunakan JPEG atau PNG"
-    );
-  }
-
-  if (ktpFile.size > MAX_KTP_SIZE) {
-    throw new AppError(400, "Ukuran file KTP maksimal 5MB");
-  }
+  validateFile(ktpFile, ALLOWED_KTP_TYPES, MAX_KTP_SIZE, "KTP");
 
   const user = await prisma.user.findUnique({
     where: { id: userId },

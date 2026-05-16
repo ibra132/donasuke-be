@@ -1,13 +1,6 @@
 import { getSupabaseClient } from "../lib/supabase";
+import { BUCKETS } from "../utils/constants";
 import { AppError } from "../utils/error";
-
-export const BUCKETS = {
-  KTP: "ktp",
-  AVATAR: "avatar",
-  CAMPAIGN_IMAGES: "campaign-images",
-  CAMPAIGN_DOCS: "campaign-docs",
-  WITHDRAWAL_PROOF: "withdrawal-proof",
-} as const;
 
 export async function uploadFile(
   bucket: string,

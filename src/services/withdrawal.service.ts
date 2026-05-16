@@ -1,7 +1,8 @@
 import prisma from "../lib/prisma";
-import { uploadFile, BUCKETS, getSignedUrl } from "./storage.service";
+import { uploadFile, getSignedUrl } from "./storage.service";
 import { AppError } from "../utils/error";
-import { WITHDRAWAL_ADMIN_FEE } from "../utils/constants";
+import { BUCKETS, WITHDRAWAL_ADMIN_FEE } from "../utils/constants";
+import { validateFile } from "../utils/file";
 
 type CreateWithdrawalInput = {
   campaignId: string;
@@ -209,14 +210,7 @@ export async function markWithdrawalPaid(
   const ALLOWED = ["image/jpeg", "image/png", "application/pdf"];
   const MAX_SIZE = 10 * 1024 * 1024;
 
-  if (!ALLOWED.includes(proofFile.type))
-    throw new AppError(
-      400,
-      "Format bukti transfer tidak valid. Gunakan JPG, PNG, atau PDF"
-    );
-
-  if (proofFile.size > MAX_SIZE)
-    throw new AppError(400, "Ukuran file maksimal 10MB");
+  validateFile(proofFile, ALLOWED, MAX_SIZE, "Bukti transfer");
 
   const existing = await prisma.withdrawal.findUnique({
     where: { id: withdrawalId },
